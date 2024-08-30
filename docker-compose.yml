@@ -16,5 +16,23 @@ services:
     volumes:
       - db:/var/lib/postgresql/data
 
+  app:
+    depends_on:
+      - db
+    env_file:
+      - .env
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+     - GEMINI_API_KEY=${GEMINI_API_KEY}
+     - GEMINI_PRO_VISION_MODEL=${GEMINI_PRO_VISION_MODEL}
+     - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@gemini-pg:5432/${POSTGRES_DB}
+     - POSTGRES_USER=${POSTGRES_USER}
+     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+     - POSTGRES_DB=${POSTGRES_DB}
+     - PGDATA=${PGDATA}
+     - PORT=${PORT}
+
 volumes:
   db:
