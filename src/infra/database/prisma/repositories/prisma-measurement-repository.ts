@@ -1,3 +1,4 @@
+import { MeasurementFilter } from '@/domain/filters/measurement-filter';
 import { MeasurementRepository } from '@/domain/repositories/measurement-repository';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
@@ -10,18 +11,28 @@ export class PrismaMeasurementRepository implements MeasurementRepository {
 
   constructor(private prisma: PrismaService) { }
 
-  public async findById(measurement_uuid: string): Promise<Measurement | null> {
-    const measurement = await this.prisma.measurement.findUnique({
-      where: {
-        id: measurement_uuid
-      }
-    });
+  public async find(filter: MeasurementFilter): Promise<Measurement[]> {
+    const { measurementId, customerCode, measureType } = filter;
 
-    if (!measurement) {
-      return null;
-    }
+    const where = {
+      ...(measurementId && { id: measurementId }),
+      ...(customerCode && { customer_code: customerCode }),
+      ...(measureType && { measurement_type: measureType }),
+    };
 
-    return PrismaMeasurementMapper.toDomain(measurement);
+    const measurements = await this.prisma.measurement.findMany({ where });
+
+    return measurements.map(PrismaMeasurementMapper.toDomain);
+  }
+
+  public async findById(filter: MeasurementFilter): Promise<Measurement | null> {
+    const results = await this.find(filter);
+    return results.length > 0 ? results[0] : null;
+  }
+
+  public async save(measurement: Measurement): Promise<void> {
+    const data = PrismaMeasurementMapper.toPrisma(measurement);
+    await this.prisma.measurement.create({ data });
   }
 
   public async confirmValue(measurement_uuid: string, confirmed_value: number): Promise<void> {

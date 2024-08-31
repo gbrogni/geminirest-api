@@ -3,9 +3,10 @@ import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { MeasurementRepository } from '../repositories/measurement-repository';
 import { Measurement } from '../entities/measure';
+import { MeasurementFilter } from '../filters/measurement-filter';
 
 const confirmMeasurementBodySchema = z.object({
-  measure_uuid: z.string().uuid(),
+  measure_uuid: z.string(),
   confirmed_value: z.number()
 });
 
@@ -47,7 +48,9 @@ export class ConfirmMeasurementUseCase {
       });
     }
 
-    const measurement: Measurement | null = await this.measurementRepository.findById(measure_uuid);
+    const filter = new MeasurementFilter();
+    filter.measurementId = measure_uuid;
+    const measurement: Measurement | null = await this.measurementRepository.findById(filter);
     if (!measurement) {
       return left({
         error_code: 'MEASURE_NOT_FOUND',

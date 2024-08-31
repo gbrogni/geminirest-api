@@ -1,13 +1,16 @@
-import { Either, left, right } from '@/core/either';
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { Injectable } from '@nestjs/common';
 import { IGeminiService } from '../services/gemini-service';
 import { GenAiResponse } from '../../infra/gemini/interfaces/gen-ai-response';
-import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
-import * as path from 'path';
 import { z } from 'zod';
 import { MeasurementRepository } from '../repositories/measurement-repository';
 import { MeasurementType } from '../entities/measurement-type';
+import { Either, left, right } from '@/core/either';
+import { Measurement } from '../entities/measure';
+import { CustomerRepository } from '../repositories/customer-repository';
+import { Customer } from '../entities/customer';
 
 const uploadFileBodySchema = z.object({
   image: z.string().refine((val) => {
@@ -48,7 +51,8 @@ export type UploadFileUseCaseResponse = Either<UploadFileUseCaseError, UploadFil
 export class UploadFileUseCase {
   constructor(
     private geminiSerice: IGeminiService,
-    private measurementRepository: MeasurementRepository
+    private measurementRepository: MeasurementRepository,
+    private customerRepository: CustomerRepository
   ) { }
 
   public async execute({
@@ -73,6 +77,14 @@ export class UploadFileUseCase {
       });
     }
 
+    const customer: Customer | null = await this.customerRepository.findById(customer_code);
+    if (!customer) {
+      return left({
+        error_code: 'INVALID_DATA',
+        error_description: 'Cliente não encontrado'
+      });
+    }
+
     const alreadyExistsMonthlyCheck: boolean = await this.measurementRepository.existsMonthlyCheck(
       customer_code,
       measure_datetime,
@@ -87,24 +99,26 @@ export class UploadFileUseCase {
     }
 
     const genAiResponse: GenAiResponse = await this.geminiSerice.generateTextFromMultiModal(
-      'em somente um número, me informe qual o numero que esta na imagem, sem mais nenhum texto, somente o numero',
+      'Informe somente o número em que aparece no medidor, sem nenhum texto, somente o número.',
       image
     );
 
     const measure_uuid: string = uuidv4();
-    const base64Data: string = image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer: Buffer = Buffer.from(base64Data, 'base64');
-    const tempDir: string = path.join(__dirname, '..', 'temp-images');
-    const imagePath: string = path.join(tempDir, `${measure_uuid}.jpg`);
+    const measure_value: number = parseFloat(genAiResponse.text);
 
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir);
-    }
+    const imageBuffer: Buffer = Buffer.from(image, 'base64');
+    const imageFileName = `${measure_uuid}.jpg`;
+    const imagePath: string = path.join(process.cwd(), 'temp-images', imageFileName);
 
-    fs.writeFileSync(imagePath, buffer);
+    fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-    const image_url: string = `http://localhost:3000/temp-images/${measure_uuid}.jpg`;
-    const measure_value = parseFloat(genAiResponse.text);
+    fs.writeFileSync(imagePath, imageBuffer);
+
+    const image_url = `http://localhost:3000/temp-images/${imageFileName}`;
+    const newImagePath = `/temp-images/${imageFileName}`;
+
+    const measurement = new Measurement(customer_code, measure_datetime, measure_type, newImagePath, measure_value, false, measure_uuid);
+    this.measurementRepository.save(measurement);
 
     return right({
       image_url,

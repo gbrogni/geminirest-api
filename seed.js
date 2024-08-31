@@ -2,24 +2,21 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const customer = await prisma.customer.upsert({
-    where: { code: 'default-customer' },
-    update: {},
-    create: {
-      code: 'default-customer',
-    },
-  });
+  const customers = [
+    { id: 'customer-1' },
+    { id: 'customer-2' },
+    { id: 'customer-3' },
+  ];
 
-  await prisma.measure.create({
-    data: {
-      image_url: 'http://example.com/image.jpg',
-      measure_value: 100,
-      measure_uuid: 'unique-uuid',
-      measure_datetime: new Date(),
-      measure_type: 'WATER',
-      customer_code: customer.id,
-    },
-  });
+  for (const customerData of customers) {
+    await prisma.customer.upsert({
+      where: { id: customerData.id },
+      update: {},
+      create: {
+        id: customerData.id,
+      },
+    });
+  }
 }
 
 main()

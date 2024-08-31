@@ -1,6 +1,6 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgres://postgres:docker@db:5432/gemini-api"
 }
 
 generator client {
@@ -10,10 +10,8 @@ generator client {
 model Measurement {
   id                   String          @id @default(uuid())
   image_url            String
-  measurement_value    Int             @map("measurement_value")
+  measurement_value    Int
   has_confirmed        Boolean         @default(false)
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
   measurement_datetime DateTime
   measurement_type     MeasurementType
   customer_code        String
